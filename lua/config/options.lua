@@ -55,10 +55,15 @@ function _G.repo_tabline()
   for i = 1, vim.fn.tabpagenr("$") do
     local hl = i == vim.fn.tabpagenr() and "%#TabLineSel#" or "%#TabLine#"
     local name = vim.fn.fnamemodify(vim.fn.getcwd(-1, i), ":t")
-    for _, buf in ipairs(vim.fn.tabpagebuflist(i)) do
-      if vim.api.nvim_buf_get_name(buf):match("^diffview://") then
-        name = name .. " · diff"
-        break
+    local label = vim.fn.gettabvar(i, "review_label", "")
+    if label ~= "" then
+      name = name .. " · " .. label
+    else
+      for _, buf in ipairs(vim.fn.tabpagebuflist(i)) do
+        if vim.api.nvim_buf_get_name(buf):match("^diffview://") then
+          name = name .. " · diff"
+          break
+        end
       end
     end
     table.insert(parts, hl .. "%" .. i .. "T  " .. name .. "  ")

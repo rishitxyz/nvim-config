@@ -1,0 +1,209 @@
+#!/bin/bash
+# Opens PR diffs, files or PR conversations in the running Neovim (or a new Ghostty window).
+#
+# Usage:
+#   nvim-review [PR]                  diff of a PR, or of the current branch when no PR is given
+#   nvim-review --file PATH[:LINE]    open a file for editing, at LINE if given (repeatable)
+#   nvim-review --comments [PR]       open a PR's conversation and review comments (Octo)
+#   add --repo DIR                    to run against DIR instead of the current directory
+#
+# PR is a number or a GitHub URL. For a URL, the local clone is found under ~/dev or ~/.t3/worktrees.
+# A diff shows the files on disk (uncommitted changes included) when a local worktree has the
+# PR's branch checked out. Otherwise it fetches the PR head without checking it out.
+set -euo pipefail
+
+SOCKETS="${XDG_STATE_HOME:-$HOME/.local/state}/nvim/sockets"
+NVIM="$(command -v nvim)" || { echo "nvim-review: nvim is not on PATH" >&2; exit 1; }
+
+die() {
+  echo "nvim-review: $*" >&2
+  exit 1
+}
+
+with_timeout() {
+  if command -v timeout >/dev/null; then timeout 5 "$@"; else "$@"; fi
+}
+
+matches_slug() {
+  git -C "$1" remote get-url origin 2>/dev/null | grep -qiE "github\.com[:/]$2(\.git)?$"
+}
+
+# write_spec KEY=VALUE... [-- PATH LINE PATH LINE...]: writes the request for review.lua to a temp file.
+write_spec() {
+  spec="$(mktemp "${TMPDIR:-/tmp}/nvim-review.XXXXXX")"
+  python3 -I - "$spec" "$@" <<'PY'
+import json, sys
+out, args = sys.argv[1], sys.argv[2:]
+spec, files = {}, []
+if "--" in args:
+    i = args.index("--")
+    args, rest = args[:i], args[i + 1:]
+    files = [{"path": rest[j], "line": int(rest[j + 1])} for j in range(0, len(rest), 2)]
+for arg in args:
+    key, value = arg.split("=", 1)
+    spec[key] = {"true": True, "false": False}.get(value, value)
+if files:
+    spec["files"] = files
+with open(out, "w") as f:
+    json.dump(spec, f)
+PY
+}
+
+alive() {
+  [ -S "$1" ] && [ "$(with_timeout "$NVIM" --server "$1" --remote-expr 1 2>/dev/null)" = "1" ]
+}
+
+# deliver DIR: sends $spec to the most recently focused Neovim, or starts one in a new Ghostty window.
+deliver() {
+  local sock="" s result launcher
+  if [ -f "$SOCKETS/last" ] && alive "$(cat "$SOCKETS/last")"; then
+    sock="$(cat "$SOCKETS/last")"
+  else
+    for s in $(ls -t "$SOCKETS"/*.sock 2>/dev/null || true); do
+      if alive "$s"; then
+        sock="$s"
+        break
+      fi
+      rm -f "$s"
+    done
+  fi
+
+  if [ -n "$sock" ]; then
+    result="$(with_timeout "$NVIM" --server "$sock" --remote-expr "v:lua.require'review'.open_file('$spec')")" ||
+      die "Neovim at $sock did not respond"
+    [ "$result" = "ok" ] || die "$result"
+    open -a Ghostty
+    where="the running Neovim"
+  else
+    # Ghostty's -e on macOS runs only the program and drops its arguments,
+    # so hand it a one-off launcher that deletes itself.
+    launcher="$(mktemp "${TMPDIR:-/tmp}/nvim-review-launch.XXXXXX")"
+    cat >"$launcher" <<EOF
+#!/bin/sh
+rm -f "\$0"
+cd "$1" || exit 1
+exec "$NVIM" "+lua require('review').open_file('$spec')"
+EOF
+    chmod +x "$launcher"
+    open -na Ghostty --args -e "$launcher"
+    where="a new Ghostty window"
+  fi
+}
+
+mode=diff pr="" dir="$PWD"
+files=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) dir="$2"; shift 2 ;;
+    --file) mode=files; files+=("$2"); shift 2 ;;
+    --comments) mode=comments; shift ;;
+    -h | --help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) die "unknown option $1 (see --help)" ;;
+    *) pr="$1"; shift ;;
+  esac
+done
+
+if [ "$mode" = files ]; then
+  [ -d "$dir" ] || die "$dir is not a directory"
+  pairs=()
+  for arg in "${files[@]}"; do
+    path="$arg" line=0
+    if [[ "$path" =~ ^(.+):([0-9]+)$ ]]; then
+      path="${BASH_REMATCH[1]}"
+      line="${BASH_REMATCH[2]}"
+    fi
+    case "$path" in
+      /*) ;;
+      "~"/*) path="$HOME/${path#"~/"}" ;;
+      *) path="$dir/$path" ;;
+    esac
+    [ -f "$path" ] || die "no such file: $path"
+    path="$(cd "$(dirname "$path")" && pwd -P)/$(basename "$path")"
+    pairs+=("$path" "$line")
+  done
+  first_dir="$(dirname "${pairs[0]}")"
+  root="$(git -C "$first_dir" rev-parse --show-toplevel 2>/dev/null || echo "$first_dir")"
+  write_spec kind=files dir="$root" -- "${pairs[@]}"
+  deliver "$root"
+  echo "Opened ${files[*]} in $where (tab for $(basename "$root"))"
+  exit 0
+fi
+
+slug=""
+if [[ "$pr" =~ github\.com/([^/]+/[^/]+)/pull/([0-9]+) ]]; then
+  slug="${BASH_REMATCH[1]}"
+  pr="${BASH_REMATCH[2]}"
+  if ! matches_slug "$dir" "$slug"; then
+    clone=""
+    for d in "$HOME"/dev/*/*/ "$HOME"/.t3/worktrees/*/ "$HOME"/.t3/worktrees/*/*/; do
+      if [ -e "$d.git" ] && matches_slug "$d" "$slug"; then
+        clone="${d%/}"
+        break
+      fi
+    done
+    if [ -n "$clone" ]; then
+      dir="$clone"
+    elif [ "$mode" = diff ]; then
+      die "no local clone of $slug under ~/dev or ~/.t3/worktrees"
+    fi
+  fi
+fi
+[[ -z "$pr" || "$pr" =~ ^[0-9]+$ ]] || die "expected a PR number or URL, got '$pr'"
+
+if [ "$mode" = comments ]; then
+  root="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || echo "$dir")"
+  cd "$root"
+  repo_flag=()
+  [ -n "$slug" ] && repo_flag=(-R "$slug")
+  # shellcheck disable=SC2086 # empty $pr means "the current branch's PR"
+  info="$(gh pr view $pr ${repo_flag[@]+"${repo_flag[@]}"} --json number,url,title -q '[.number, .url, .title] | @tsv' 2>/dev/null)" ||
+    die "no pull request found${pr:+ for #$pr}"
+  IFS=$'\t' read -r number url title <<<"$info"
+  [[ "$url" =~ github\.com/([^/]+/[^/]+)/pull/ ]] && slug="${BASH_REMATCH[1]}"
+  write_spec kind=comments dir="$root" repo="$slug" pr="$number" label="PR #$number comments"
+  deliver "$root"
+  echo "Opened the conversation of PR #$number ($title) in $where"
+  exit 0
+fi
+
+root="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" || die "$dir is not a git repository"
+dir="$root"
+cd "$dir"
+
+# shellcheck disable=SC2086 # empty $pr means "the current branch's PR"
+if info="$(gh pr view $pr --json number,baseRefName,headRefName,title -q '[.number, .baseRefName, .headRefName, .title] | @tsv' 2>/dev/null)"; then
+  IFS=$'\t' read -r number base head title <<<"$info"
+  label="PR #$number"
+elif [ -n "$pr" ]; then
+  die "PR #$pr not found in $(basename "$dir")"
+else
+  number="" title=""
+  head="$(git branch --show-current)"
+  base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
+  base="${base#origin/}"
+  label="${head:-HEAD}"
+fi
+
+git fetch --quiet origin "$base" 2>/dev/null || echo "nvim-review: could not fetch origin/$base, using the local copy" >&2
+git rev-parse --verify --quiet "origin/$base" >/dev/null || die "origin/$base does not exist"
+
+# Prefer a worktree that has the branch checked out (usually the agent's), so the diff shows real files.
+worktree=""
+if [ -n "$head" ]; then
+  worktree="$(git worktree list --porcelain | awk -v ref="branch refs/heads/$head" '/^worktree /{p=substr($0,10)} $0==ref{print p; exit}')"
+fi
+if [ -n "$worktree" ] || [ -z "$number" ]; then
+  dir="${worktree:-$dir}"
+  head_ref="HEAD"
+  local_mode=true
+  source_desc="files in $dir"
+else
+  head_ref="refs/remotes/origin/pr/$number"
+  git fetch --quiet origin "+pull/$number/head:$head_ref" || die "could not fetch PR #$number"
+  local_mode=false
+  source_desc="fetched PR head (not checked out locally)"
+fi
+
+write_spec kind=diff dir="$dir" base="origin/$base" head="$head_ref" local_mode="$local_mode" label="$label"
+deliver "$dir"
+echo "Opened $label${title:+ ($title)} in $where: origin/$base...$head_ref, $source_desc"

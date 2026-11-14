@@ -15,6 +15,42 @@ It covers Python (FastAPI), TypeScript (React, Vite, Electron) and Rust, uses [l
 
 Format on save is off by default so saving during a review doesn't add formatting changes to the agent's diff. `Space uf` turns it on.
 
+## Asking an agent to open things in Neovim
+
+From an agent thread you can ask for these, and they open in Neovim:
+
+| Prompt | Opens |
+|---|---|
+| "show me the diffs of this PR in nvim" | The PR's diff in its own tab, labeled with the PR number |
+| "show me the file where X is defined in nvim" | That file at the right line, in the tab for its repo |
+| "open package.json in nvim so I can edit it" | The file as a normal buffer, ready to edit |
+| "show me the PR comments in nvim" | The PR's conversation and review comments in Octo |
+
+How it works:
+
+- `lua/review.lua` makes every Neovim with a UI listen on `~/.local/state/nvim/sockets/<pid>.sock` and records the most recently focused one. Asking for the same diff or PR again refreshes its tab instead of adding another.
+- `bin/nvim-review` resolves the request and sends it to that Neovim, then brings Ghostty to the front. With no Neovim running, it opens a new Ghostty window.
+- For diffs, if a local worktree has the PR's branch checked out (usually the agent's own), the diff shows the files on disk, uncommitted changes included. Otherwise it fetches the PR head without checking anything out.
+- `agent-skills/nvim-review` is a skill that tells Claude Code and Codex agents when to run the script and which arguments to pass.
+
+```sh
+nvim-review                      # this branch's PR, or the branch against the default branch
+nvim-review 512                  # PR #512 of the repo in the current directory
+nvim-review <PR URL>             # any PR; finds the local clone under ~/dev or ~/.t3/worktrees
+nvim-review --file src/app.ts:42 # a file at a line (repeat --file for more files)
+nvim-review --comments [PR]      # a PR's conversation
+```
+
+To install, link the script and the skill:
+
+```sh
+ln -s ~/.config/nvim/bin/nvim-review ~/.local/bin/nvim-review
+ln -s ~/.config/nvim/agent-skills/nvim-review ~/.claude/skills/nvim-review
+ln -s ~/.config/nvim/agent-skills/nvim-review ~/.codex/skills/nvim-review
+```
+
+Agents need network access (for `gh` and `git fetch`) and access to the socket, so Codex has to run with full access rather than its default sandbox.
+
 ## Requirements
 
 - Neovim 0.12 or newer
