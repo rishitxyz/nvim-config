@@ -39,6 +39,16 @@ The first launch installs the plugins, Treesitter parsers, language servers and 
 
 Leader is Space. Localleader is `,` and is used inside Octo PR buffers (for example `,ca` to comment, `,pa` to approve). Press Space and wait to see every keymap.
 
+The table below has the main ones. The full list, grouped by task, is in [`keybinds/`](keybinds):
+
+- [Repos, tabs and files](keybinds/repos-tabs-files.md)
+- [Reading code](keybinds/reading-code.md)
+- [Diffs](keybinds/diffs.md)
+- [Sending feedback to the agent](keybinds/agent-feedback.md)
+- [GitHub PRs and CI](keybinds/github-prs-ci.md)
+- [Editing](keybinds/editing.md)
+- [Sessions](keybinds/sessions.md)
+
 | Keys | Action |
 |---|---|
 | `Space fp` | Open a repo or agent worktree in its own tab |
