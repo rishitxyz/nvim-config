@@ -5,6 +5,77 @@ local M = {}
 
 local sock_dir = vim.fn.stdpath("state") .. "/sockets"
 local last_file = sock_dir .. "/last"
+local window_script = vim.fn.stdpath("config") .. "/bin/ghostty-window.js"
+
+local function notify(msg, level)
+  vim.notify(msg, level or vim.log.levels.INFO, { title = "Review" })
+end
+
+-- Diffs get a maximized Ghostty window; the old size comes back when the last diff closes.
+-- The window is found by a title marker unique to this Neovim.
+local title_marker ---@type string?
+local saved_bounds ---@type string?
+local open_diffs = 0
+local warned = false
+local ui_ready = false
+local after_ui = {} ---@type fun()[]
+
+local function ghostty_window(action, arg, on_done, attempt)
+  if not ui_ready then
+    -- A diff requested at startup opens before the UI attaches and sets the window title.
+    table.insert(after_ui, function()
+      ghostty_window(action, arg, on_done)
+    end)
+    return
+  end
+  if not title_marker then
+    return
+  end
+  attempt = attempt or 1
+  vim.system({ "osascript", "-l", "JavaScript", window_script, title_marker, action, arg }, { text = true }, vim.schedule_wrap(function(res)
+    local out = vim.trim(res.stdout or "")
+    if out:match("^error: no Ghostty window") and attempt < 10 then
+      -- System Events briefly reports no windows while Ghostty is being activated,
+      -- and a new window may not show its title yet.
+      vim.defer_fn(function()
+        ghostty_window(action, arg, on_done, attempt + 1)
+      end, 300)
+      return
+    end
+    if res.code ~= 0 or out:match("^error") then
+      if not warned then
+        warned = true
+        local detail = vim.trim(out .. " " .. (res.stderr or ""))
+        local denied = detail:match("assistive") or detail:match("%-1719") or detail:match("%-25211")
+        local hint = denied and "Allow Ghostty under System Settings → Privacy & Security → Accessibility."
+          or "Couldn't find this Neovim's Ghostty window."
+        notify("Couldn't resize the window. " .. hint .. "\n" .. detail, vim.log.levels.WARN)
+      end
+      return
+    end
+    if on_done then
+      on_done(out)
+    end
+  end))
+end
+
+function M.on_diff_opened()
+  open_diffs = open_diffs + 1
+  if open_diffs == 1 then
+    ghostty_window("maximize", "", function(bounds)
+      saved_bounds = bounds
+    end)
+  end
+end
+
+function M.on_diff_closed()
+  open_diffs = math.max(open_diffs - 1, 0)
+  if open_diffs == 0 and saved_bounds then
+    local bounds = saved_bounds
+    saved_bounds = nil
+    ghostty_window("restore", bounds)
+  end
+end
 
 function M.setup()
   local group = vim.api.nvim_create_augroup("user_review", { clear = true })
@@ -23,6 +94,16 @@ function M.setup()
     group = group,
     once = true,
     callback = function()
+      if vim.env.TERM_PROGRAM == "ghostty" and vim.fn.has("mac") == 1 then
+        title_marker = "nvim " .. vim.fn.getpid()
+        vim.o.title = true
+        vim.o.titlestring = "%{fnamemodify(getcwd(), ':t')} · " .. title_marker
+      end
+      ui_ready = true
+      for _, fn in ipairs(after_ui) do
+        vim.schedule(fn)
+      end
+      after_ui = {}
       vim.fn.mkdir(sock_dir, "p")
       os.remove(path)
       if pcall(vim.fn.serverstart, path) then
@@ -37,10 +118,6 @@ function M.setup()
       end
     end,
   })
-end
-
-local function notify(msg, level)
-  vim.notify(msg, level or vim.log.levels.INFO, { title = "Review" })
 end
 
 local function tab_is_empty()

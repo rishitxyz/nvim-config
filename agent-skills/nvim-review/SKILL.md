@@ -5,7 +5,7 @@ description: Open files, PR or branch diffs, or a PR's conversation in the user'
 
 # nvim-review
 
-Run `~/.config/nvim/bin/nvim-review` with Bash, from your current working directory. It opens the request in the user's running Neovim, or in a new Ghostty window if none is running, and brings it to the front.
+Run `~/.config/nvim/bin/nvim-review` with Bash, from your current working directory. It opens the request in the user's running Neovim, or in a new tab of their Ghostty window if none is running. It never takes focus away from the app the user is in, so tell them where it opened.
 
 Pick the mode from what the user asked for:
 

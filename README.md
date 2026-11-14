@@ -29,9 +29,10 @@ From an agent thread you can ask for these, and they open in Neovim:
 How it works:
 
 - `lua/review.lua` makes every Neovim with a UI listen on `~/.local/state/nvim/sockets/<pid>.sock` and records the most recently focused one. Asking for the same diff or PR again refreshes its tab instead of adding another.
-- `bin/nvim-review` resolves the request and sends it to that Neovim, then brings Ghostty to the front. With no Neovim running, it opens a new Ghostty window.
+- `bin/nvim-review` resolves the request and sends it to that Neovim. It never brings Ghostty to the front, so the app you're in keeps focus.
+- With no Neovim running, it opens Neovim as a new tab in your frontmost Ghostty window, so it lands on that window's desktop (macOS has no public way to put a new window on a chosen desktop). With no Ghostty window, it opens a new window on the current desktop. The tab closes when Neovim quits.
 - For diffs, if a local worktree has the PR's branch checked out (usually the agent's own), the diff shows the files on disk, uncommitted changes included. Otherwise it fetches the PR head without checking anything out.
-- `agent-skills/nvim-review` is a skill that tells Claude Code and Codex agents when to run the script and which arguments to pass.
+- Opening any diff (from an agent, `Space gd` or `Space gD`) maximizes the Ghostty window, and the old size comes back when the last diff closes. `bin/ghostty-window.js` does the resizing, and finds the window by the `nvim <pid>` marker Neovim puts in its title. It needs Ghostty to have Accessibility access (System Settings → Privacy & Security → Accessibility).- `agent-skills/nvim-review` is a skill that tells Claude Code and Codex agents when to run the script and which arguments to pass.
 
 ```sh
 nvim-review                      # this branch's PR, or the branch against the default branch

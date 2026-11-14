@@ -226,7 +226,13 @@ return {
   {
     "sindrets/diffview.nvim",
     cmd = { "DiffviewOpen", "DiffviewFileHistory" },
-    opts = { enhanced_diff_hl = true },
+    opts = {
+      enhanced_diff_hl = true,
+      hooks = {
+        view_opened = function() require("review").on_diff_opened() end,
+        view_closed = function() require("review").on_diff_closed() end,
+      },
+    },
     keys = {
       { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Diff uncommitted changes" },
       { "<leader>gD", diff_against_base, desc = "Diff branch vs PR base" },
