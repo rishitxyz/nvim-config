@@ -32,7 +32,8 @@ opt.swapfile = false
 opt.confirm = true
 opt.updatetime = 250
 opt.timeoutlen = 400
-opt.diffopt:append({ "algorithm:histogram" })
+opt.diffopt:append({ "algorithm:histogram", "inline:word" })
+opt.sessionoptions = { "buffers", "curdir", "folds", "tabpages", "winsize" }
 
 vim.diagnostic.config({
   severity_sort = true,

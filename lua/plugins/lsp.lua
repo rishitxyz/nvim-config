@@ -113,8 +113,9 @@ return {
         prettier = { require_cwd = true },
         biome = { require_cwd = true },
       },
-      format_on_save = function(buf)
-        if vim.g.disable_autoformat or vim.b[buf].disable_autoformat then
+      -- Off by default: saving during review shouldn't add formatting churn to an agent's diff.
+      format_on_save = function()
+        if not vim.g.autoformat then
           return
         end
         return { timeout_ms = 1500, lsp_format = "never" }
@@ -125,8 +126,8 @@ return {
       {
         "<leader>uf",
         function()
-          vim.g.disable_autoformat = not vim.g.disable_autoformat
-          vim.notify("Format on save " .. (vim.g.disable_autoformat and "off" or "on"))
+          vim.g.autoformat = not vim.g.autoformat
+          vim.notify("Format on save " .. (vim.g.autoformat and "on" or "off"))
         end,
         desc = "Toggle format on save",
       },

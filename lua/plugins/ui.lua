@@ -1,14 +1,12 @@
 return {
   {
-    "rebelot/kanagawa.nvim",
+    "rose-pine/neovim",
+    name = "rose-pine",
     lazy = false,
     priority = 1000,
     config = function()
-      require("kanagawa").setup({
-        background = { dark = "dragon" },
-        colors = { theme = { all = { ui = { bg_gutter = "none" } } } },
-      })
-      vim.cmd.colorscheme("kanagawa")
+      require("rose-pine").setup({ variant = "main", dark_variant = "main" })
+      vim.cmd.colorscheme("rose-pine")
     end,
   },
   {
@@ -38,10 +36,18 @@ return {
         { "<leader>f", group = "find" },
         { "<leader>g", group = "git" },
         { "<leader>h", group = "hunk" },
+        { "<leader>q", group = "session" },
         { "<leader>s", group = "search" },
         { "<leader>t", group = "tabs" },
         { "<leader>u", group = "toggle" },
+        { "<leader>y", group = "copy" },
       },
     },
+  },
+  {
+    "MeanderingProgrammer/render-markdown.nvim",
+    ft = { "markdown", "octo" },
+    dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-mini/mini.icons" },
+    opts = { file_types = { "markdown", "octo" } },
   },
 }

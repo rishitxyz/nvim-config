@@ -7,6 +7,23 @@ vim.api.nvim_create_autocmd("TextYankPost", {
   end,
 })
 
+-- Agents edit files on disk while they are open here; re-check whenever focus or buffers change.
+vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold", "TermClose", "TermLeave" }, {
+  group = group,
+  callback = function()
+    if vim.fn.getcmdwintype() == "" then
+      vim.cmd("checktime")
+    end
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileChangedShellPost", {
+  group = group,
+  callback = function(ev)
+    vim.notify("Reloaded " .. vim.fn.fnamemodify(ev.file, ":."), vim.log.levels.INFO)
+  end,
+})
+
 vim.api.nvim_create_autocmd("VimResized", {
   group = group,
   command = "tabdo wincmd =",
