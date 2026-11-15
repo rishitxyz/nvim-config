@@ -13,7 +13,7 @@ It covers Python (FastAPI), TypeScript (React, Vite, Electron) and Rust, uses [l
 5. `Space gr` starts a GitHub review in Octo, where comments, approvals and "viewed" marks sync to the PR.
 6. `Space ga` shows CI status and opens the logs of failed runs. `Space gm` squash-merges after a confirmation and deletes only the remote branch, so the agent's local worktree stays intact.
 
-Format on save is off by default so saving during a review doesn't add formatting changes to the agent's diff. `Space uf` turns it on.
+Format on save is off by default so saving during a review doesn't add formatting changes to the agent's diff. `Space uf` turns it on for the current buffer only.
 
 ## Asking an agent to open things in Neovim
 

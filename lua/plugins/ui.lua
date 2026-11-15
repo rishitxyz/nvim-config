@@ -1,5 +1,20 @@
 return {
   {
+    "b0o/incline.nvim",
+    event = "VeryLazy",
+    opts = {
+      window = { margin = { vertical = 0, horizontal = 1 }, zindex = 10 },
+      hide = { cursorline = "smart", only_win = true },
+      render = function(props)
+        local file = vim.api.nvim_buf_get_name(props.buf)
+        if file == "" then return "[No Name]" end
+        local root = vim.fs.root(props.buf, ".git")
+        local path = root and vim.fs.relpath(root, file) or vim.fn.fnamemodify(file, ":~")
+        return { { path, gui = props.focused and "bold" or nil }, vim.bo[props.buf].modified and " [+]" or "" }
+      end,
+    },
+  },
+  {
     "rose-pine/neovim",
     name = "rose-pine",
     lazy = false,

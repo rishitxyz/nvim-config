@@ -10,7 +10,10 @@
 | `K` | Show docs for the symbol under the cursor |
 | `Space ss` / `Space sS` | Symbols in this file / across the whole repo |
 | `Space sw` | Search the repo for the word under the cursor |
-| `Space sd` | List all errors and warnings |
+| `Space sd` | List errors and warnings inside the current worktree |
 | `Space cd` | Show the full error message on the current line |
 | `Space sr` | Reopen the last search with its results |
 | `Space sh` / `Space sk` | Search help docs / search keymaps |
+| `Space si` | List incoming calls to the symbol under the cursor |
+| `Space cD` | Go to TypeScript source definition; ordinary definition for other languages |
+| `Space sD` | Diagnostics across all loaded buffers, including other worktrees |

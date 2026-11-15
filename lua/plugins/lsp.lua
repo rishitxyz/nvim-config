@@ -55,6 +55,10 @@ return {
         end,
       })
 
+      vim.lsp.config("vtsls", {
+        settings = { vtsls = { autoUseWorkspaceTsdk = true } },
+      })
+
       vim.lsp.config("rust_analyzer", {
         settings = { ["rust-analyzer"] = { check = { command = "clippy" } } },
       })
@@ -78,6 +82,34 @@ return {
           local function map(lhs, rhs, desc)
             vim.keymap.set("n", lhs, rhs, { buffer = ev.buf, desc = desc })
           end
+          map("<leader>cD", function()
+            local win = vim.api.nvim_get_current_win()
+            local source_client = vim.lsp.get_clients({ bufnr = ev.buf, name = "vtsls" })[1]
+            if not source_client then
+              vim.lsp.buf.definition()
+              return
+            end
+            local encoding = source_client.offset_encoding or "utf-16"
+            local params = vim.lsp.util.make_position_params(0, encoding)
+            source_client:exec_cmd({
+              command = "typescript.goToSourceDefinition",
+              arguments = { params.textDocument.uri, params.position },
+            }, { bufnr = ev.buf }, function(err, result)
+              -- The response may arrive after a tab switch, buffer change, or window close.
+              if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= ev.buf then
+                return
+              end
+              if err then
+                vim.notify(err.message, vim.log.levels.ERROR)
+              elseif result and #result > 0 then
+                vim.api.nvim_win_call(win, function()
+                  vim.lsp.util.show_document(result[1], encoding, { focus = true })
+                end)
+              else
+                vim.notify("No source definition found")
+              end
+            end)
+          end, "Go to source definition")
           map("<leader>cr", vim.lsp.buf.rename, "Rename symbol")
           map("<leader>ca", vim.lsp.buf.code_action, "Code action")
           map("<leader>uh", function()
@@ -114,8 +146,8 @@ return {
         biome = { require_cwd = true },
       },
       -- Off by default: saving during review shouldn't add formatting churn to an agent's diff.
-      format_on_save = function()
-        if not vim.g.autoformat then
+      format_on_save = function(bufnr)
+        if not vim.b[bufnr].autoformat then
           return
         end
         return { timeout_ms = 1500, lsp_format = "never" }
@@ -126,10 +158,10 @@ return {
       {
         "<leader>uf",
         function()
-          vim.g.autoformat = not vim.g.autoformat
-          vim.notify("Format on save " .. (vim.g.autoformat and "on" or "off"))
+          vim.b.autoformat = not vim.b.autoformat
+          vim.notify("Format on save for this buffer " .. (vim.b.autoformat and "on" or "off"))
         end,
-        desc = "Toggle format on save",
+        desc = "Toggle format on save (buffer)",
       },
     },
   },

@@ -5,3 +5,5 @@
 | `Space yr` | Copy `path:line`. With lines selected, it also copies the code in a fenced block, ready to paste into an agent thread. |
 | `Space yp` | Copy a GitHub link to the current line or selection |
 | `Space go` | Open the current file or selection on GitHub |
+| `Space ya` | Copy absolute `path:line`, identifying the exact worktree |
+| `Space yd` | Copy this line's diagnostics with worktree, location, severity, source, and rule code |

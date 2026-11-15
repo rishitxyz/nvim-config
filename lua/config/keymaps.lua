@@ -49,3 +49,34 @@ local function copy_reference()
 end
 
 map({ "n", "x" }, "<leader>yr", copy_reference, { desc = "Copy code reference" })
+
+-- Include the worktree's absolute path when handing feedback to another agent.
+map("n", "<leader>ya", function()
+  local file = vim.api.nvim_buf_get_name(0)
+  if vim.bo.buftype ~= "" or file == "" then
+    vim.notify("Not a file on disk", vim.log.levels.WARN)
+    return
+  end
+  vim.fn.setreg("+", ("%s:%d"):format(file, vim.fn.line(".")))
+end, { desc = "Copy absolute file reference" })
+
+map("n", "<leader>yd", function()
+  local diagnostics = vim.diagnostic.get(0, { lnum = vim.fn.line(".") - 1 })
+  if #diagnostics == 0 then
+    vim.notify("No diagnostics on this line")
+    return
+  end
+  table.sort(diagnostics, function(a, b) return a.severity < b.severity end)
+  local file = vim.api.nvim_buf_get_name(0)
+  local root = vim.fs.root(0, ".git") or vim.fn.getcwd()
+  local path = vim.fs.relpath(root, file) or file
+  local lines = { "Worktree: " .. root }
+  for _, d in ipairs(diagnostics) do
+    local details = { vim.diagnostic.severity[d.severity] }
+    if d.source then table.insert(details, d.source) end
+    if d.code then table.insert(details, tostring(d.code)) end
+    table.insert(lines, ("%s:%d:%d [%s]\n%s"):format(path, d.lnum + 1, d.col + 1, table.concat(details, ", "), d.message))
+  end
+  vim.fn.setreg("+", table.concat(lines, "\n\n"))
+  vim.notify("Copied line diagnostics")
+end, { desc = "Copy diagnostics for agent" })

@@ -38,7 +38,12 @@ opt.sessionoptions = { "buffers", "curdir", "folds", "tabpages", "winsize" }
 vim.diagnostic.config({
   severity_sort = true,
   virtual_text = { spacing = 2, prefix = "●" },
-  float = { source = "if_many" },
+  float = {
+    source = true,
+    format = function(d)
+      return d.code and ("%s [%s]"):format(d.message, d.code) or d.message
+    end,
+  },
   signs = {
     text = {
       [vim.diagnostic.severity.ERROR] = "E",
