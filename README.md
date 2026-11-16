@@ -15,9 +15,9 @@ It covers Python (FastAPI), TypeScript (React, Vite, Electron) and Rust, uses [l
 
 Format on save is off by default so saving during a review doesn't add formatting changes to the agent's diff. `Space uf` turns it on for the current buffer only.
 
-## Asking an agent to open things in Neovim
+## Asking an agent to open things in Neovide
 
-From an agent thread you can ask for these, and they open in Neovim:
+From an agent thread you can ask for these, and they open in Neovide using this Neovim configuration. Requests phrased as “in nvim”, “in Neovim” or “in my editor” also use Neovide:
 
 | Prompt | Opens |
 |---|---|
@@ -28,11 +28,12 @@ From an agent thread you can ask for these, and they open in Neovim:
 
 How it works:
 
-- `lua/review.lua` makes every Neovim with a UI listen on `~/.local/state/nvim/sockets/<pid>.sock` and records the most recently focused one. Asking for the same diff or PR again refreshes its tab instead of adding another.
-- `bin/nvim-review` resolves the request and sends it to that Neovim. It never brings Ghostty to the front, so the app you're in keeps focus.
-- With no Neovim running, it opens Neovim as a new tab in your frontmost Ghostty window, so it lands on that window's desktop (macOS has no public way to put a new window on a chosen desktop). With no Ghostty window, it opens a new window on the current desktop. The tab closes when Neovim quits.
+- `lua/review.lua` makes every Neovim with a UI listen on `~/.local/state/nvim/sockets/<pid>.sock` and records the most recently focused one, including a separate pointer for Neovide. Asking for the same diff or PR again refreshes its tab instead of adding another.
+- `bin/nvim-review` resolves the request and sends it to the most recently focused Neovide. It keeps terminal Neovim sessions separate. New windows open in the background; for the first five seconds after launch, the script restores focus if Neovide activates, stopping if you switch to another app.
+- With no Neovide running, it opens a new Neovide window. New diff windows start maximized; reused Neovide windows keep their current size.
 - For diffs, if a local worktree has the PR's branch checked out (usually the agent's own), the diff shows the files on disk, uncommitted changes included. Otherwise it fetches the PR head without checking anything out.
-- Opening any diff (from an agent, `Space gd` or `Space gD`) maximizes the Ghostty window, and the old size comes back when the last diff closes. `bin/ghostty-window.js` does the resizing, and finds the window by the `nvim <pid>` marker Neovim puts in its title. It needs Ghostty to have Accessibility access (System Settings → Privacy & Security → Accessibility).- `agent-skills/nvim-review` is a skill that tells Claude Code and Codex agents when to run the script and which arguments to pass.
+- When using terminal Neovim in Ghostty, opening a diff (from `Space gd` or `Space gD`) maximizes the Ghostty window, and the old size comes back when the last diff closes. `bin/ghostty-window.js` does the resizing, and finds the window by the `nvim <pid>` marker Neovim puts in its title. It needs Ghostty to have Accessibility access (System Settings → Privacy & Security → Accessibility).
+- `agent-skills/nvim-review` is a skill that tells Claude Code and Codex agents when to run the script and which arguments to pass.
 
 ```sh
 nvim-review                      # this branch's PR, or the branch against the default branch
@@ -55,11 +56,13 @@ Agents need network access (for `gh` and `git fetch`) and access to the socket, 
 ## Requirements
 
 - Neovim 0.12 or newer
+- Neovide installed as a macOS application (for agent requests)
 - `git`, `rg`, `fd`, `tree-sitter-cli`, `lazygit`, `node`, `gh` with the `gh-dash` extension
 - `basedpyright` from Homebrew. Mason installs it with pip, which needs Python 3.10 or newer.
 
 ```sh
 brew install neovim ripgrep fd tree-sitter-cli lazygit gh basedpyright
+brew install --cask neovide
 gh extension install dlvhdr/gh-dash
 ```
 

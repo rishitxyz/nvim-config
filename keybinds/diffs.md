@@ -1,5 +1,7 @@
 # Diffs
 
+Ask an agent to “open the diffs in Neovim” or “open the diffs in Neovide” to send the branch or PR diff to Neovide. It reuses a running Neovide session or opens a new window; terminal Neovim sessions are not reused. New diff windows start maximized, and existing windows keep their size. See [agent requests](../README.md#asking-an-agent-to-open-things-in-neovide) for commands and setup.
+
 | Keys | What it does |
 |---|---|
 | `Space gd` | Side-by-side diff of uncommitted changes |

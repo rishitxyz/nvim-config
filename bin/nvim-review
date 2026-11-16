@@ -1,5 +1,5 @@
 #!/bin/bash
-# Opens PR diffs, files or PR conversations in the running Neovim (or a new Ghostty tab), without taking focus.
+# Opens PR diffs, files or PR conversations in the running Neovide (or a new Neovide window), without taking focus.
 #
 # Usage:
 #   nvim-review [PR]                  diff of a PR, or of the current branch when no PR is given
@@ -53,89 +53,72 @@ alive() {
   [ -S "$1" ] && [ "$(with_timeout "$NVIM" --server "$1" --remote-expr 1 2>/dev/null)" = "1" ]
 }
 
+is_neovide() {
+  alive "$1" && [ "$(with_timeout "$NVIM" --server "$1" --remote-expr "get(g:, 'neovide', v:false) ? 1 : 0" 2>/dev/null)" = "1" ]
+}
+
 frontmost_pid() {
   osascript -l JavaScript -e 'ObjC.import("AppKit"); $.NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier' 2>/dev/null
 }
 
-# keep_focus PID: if Ghostty took focus, give it back to PID. Leaves focus alone if the user moved on.
+# keep_focus PID: if Neovide took focus, give it back to PID. Leaves focus alone if the user moved on.
 keep_focus() {
   [ -n "$1" ] || return 0
   osascript -l JavaScript - "$1" >/dev/null 2>&1 <<'JS' || true
 ObjC.import("AppKit");
 function run(argv) {
-  const front = $.NSWorkspace.sharedWorkspace.frontmostApplication;
-  if (front.processIdentifier === Number(argv[0]) || front.localizedName.js.toLowerCase() !== "ghostty") return;
-  const app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(Number(argv[0]));
-  if (app) app.activateWithOptions(0);
+  const original = Number(argv[0]);
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const front = $.NSWorkspace.sharedWorkspace.frontmostApplication;
+    if (front.processIdentifier !== original) {
+      // Leave focus alone if the user switched to another app during startup.
+      if (front.localizedName.js.toLowerCase() !== "neovide") return;
+      const app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(original);
+      if (app) app.activateWithOptions(0);
+      return;
+    }
+    delay(0.1);
+  }
 }
 JS
 }
 
-# deliver DIR: sends $spec to the most recently focused Neovim, or starts one in a new Ghostty window.
-# Never brings Ghostty to the front: the app the user is in keeps focus.
+# deliver DIR: reuse the most recently focused Neovide, or open a new Neovide window.
+# Keep the current app focused.
 deliver() {
-  local sock="" s result launcher focused
+  local sock="" s result focused
   focused="$(frontmost_pid)"
-  if [ -f "$SOCKETS/last" ] && alive "$(cat "$SOCKETS/last")"; then
-    sock="$(cat "$SOCKETS/last")"
+  if [ -f "$SOCKETS/last-neovide" ] && is_neovide "$(cat "$SOCKETS/last-neovide")"; then
+    sock="$(cat "$SOCKETS/last-neovide")"
   else
-    for s in $(ls -t "$SOCKETS"/*.sock 2>/dev/null || true); do
-      if alive "$s"; then
+    while IFS= read -r s; do
+      if is_neovide "$s"; then
         sock="$s"
         break
       fi
-      rm -f "$s"
-    done
+      # A live terminal Neovim is not a candidate, but keep its socket intact.
+      alive "$s" || rm -f "$s"
+    done < <(ls -t "$SOCKETS"/*.sock 2>/dev/null || true)
   fi
 
   if [ -n "$sock" ]; then
     result="$(with_timeout "$NVIM" --server "$sock" --remote-expr "v:lua.require'review'.open_file('$spec')")" ||
-      die "Neovim at $sock did not respond"
+      die "Neovide at $sock did not respond"
     [ "$result" = "ok" ] || die "$result"
-    where="the running Neovim"
+    where="the running Neovide"
   else
-    # A one-off launcher that deletes itself, since Ghostty's -e drops a command's arguments.
-    launcher="$(mktemp "${TMPDIR:-/tmp}/nvim-review-launch.XXXXXX")"
-    cat >"$launcher" <<EOF
-#!/bin/sh
-rm -f "\$0"
-export PATH='$PATH'
-cd "$1" || exit 1
-exec "$NVIM" "+lua require('review').open_file('$spec')"
-EOF
-    chmod +x "$launcher"
-    if [ "$(osascript -e 'application "Ghostty" is running' 2>/dev/null)" = "true" ]; then
-      # macOS can't put a new window on a chosen desktop, so open a tab in the main Ghostty
-      # window to land on its desktop. With no window, a new one opens on the current desktop.
-      # Going through Ghostty's AppleScript also avoids starting a second Ghostty process.
-      opened="$(osascript -e 'on run argv' \
-        -e 'tell application "Ghostty"' \
-        -e 'set cfg to {command:item 1 of argv, initial working directory:item 2 of argv, wait after command:false}' \
-        -e 'if (count of windows) > 0 then' \
-        -e 'new tab in front window with configuration cfg' \
-        -e 'return "tab"' \
-        -e 'end if' \
-        -e 'new window with configuration cfg' \
-        -e 'return "window"' \
-        -e 'end tell' \
-        -e 'end run' "$launcher" "$1")" || die "could not open Ghostty"
-    else
-      # shellcheck disable=SC2086 # ghostty_flags holds zero or more flags
-      open -g -na Ghostty --args $ghostty_flags -e "$launcher"
-      opened="window"
-    fi
-    if [ "$opened" = "tab" ]; then
-      where="a new tab in your Ghostty window"
-    else
-      where="a new Ghostty window"
-    fi
-    # A new window or a fresh launch can still activate Ghostty, sometimes a moment later.
-    keep_focus "$focused"
-    (sleep 1.5 && keep_focus "$focused") >/dev/null 2>&1 &
+    local flags=()
+    [ "$mode" != diff ] || flags+=(--maximized)
+    open -g -na Neovide --args --neovim-bin "$NVIM" --chdir "$1" \
+      ${flags[@]+"${flags[@]}"} -- "+lua require('review').open_file('$spec')" ||
+      die "could not open Neovide"
+    where="a new Neovide window"
+    # Watch for delayed activation for up to five seconds without blocking the request.
+    keep_focus "$focused" >/dev/null 2>&1 &
   fi
 }
 
-mode=diff pr="" dir="$PWD" ghostty_flags=""
+mode=diff pr="" dir="$PWD"
 files=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -249,7 +232,6 @@ else
   source_desc="fetched PR head (not checked out locally)"
 fi
 
-ghostty_flags="--maximize=true"
 write_spec kind=diff dir="$dir" base="origin/$base" head="$head_ref" local_mode="$local_mode" label="$label"
 deliver "$dir"
 echo "Opened $label${title:+ ($title)} in $where: origin/$base...$head_ref, $source_desc"

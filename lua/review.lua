@@ -5,6 +5,7 @@ local M = {}
 
 local sock_dir = vim.fn.stdpath("state") .. "/sockets"
 local last_file = sock_dir .. "/last"
+local last_neovide_file = sock_dir .. "/last-neovide"
 local window_script = vim.fn.stdpath("config") .. "/bin/ghostty-window.js"
 
 local function notify(msg, level)
@@ -87,6 +88,13 @@ function M.setup()
       f:write(path)
       f:close()
     end
+    if vim.g.neovide then
+      local gui = io.open(last_neovide_file, "w")
+      if gui then
+        gui:write(path)
+        gui:close()
+      end
+    end
   end
 
   -- Headless instances (plugin installs, scripts) never fire UIEnter, so they don't register.
@@ -94,7 +102,7 @@ function M.setup()
     group = group,
     once = true,
     callback = function()
-      if vim.env.TERM_PROGRAM == "ghostty" and vim.fn.has("mac") == 1 then
+      if not vim.g.neovide and vim.env.TERM_PROGRAM == "ghostty" and vim.fn.has("mac") == 1 then
         title_marker = "nvim " .. vim.fn.getpid()
         vim.o.title = true
         vim.o.titlestring = "%{fnamemodify(getcwd(), ':t')} · " .. title_marker

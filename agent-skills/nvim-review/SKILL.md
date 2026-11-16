@@ -1,11 +1,11 @@
 ---
 name: nvim-review
-description: Open files, PR or branch diffs, or a PR's conversation in the user's Neovim. Use when the user asks to show, open, view or edit a file, a diff, a PR, changes or PR comments "in nvim", "in neovim", "in vim" or "in my editor".
+description: Open files, PR or branch diffs, or a PR's conversation in the user's Neovide. Use when the user asks to show, open, view or edit a file, a diff, a PR, changes or PR comments "in nvim", "in neovim", "in neovide", "in vim" or "in my editor".
 ---
 
 # nvim-review
 
-Run `~/.config/nvim/bin/nvim-review` with Bash, from your current working directory. It opens the request in the user's running Neovim, or in a new tab of their Ghostty window if none is running. It never takes focus away from the app the user is in, so tell them where it opened.
+Run `~/.config/nvim/bin/nvim-review` with Bash, from your current working directory. It opens the request in the user's running Neovide, or in a new Neovide window if none is running. Terminal Neovim sessions are not reused. New windows open in the background, with a five-second startup check to restore focus if Neovide activates. Tell the user where it opened.
 
 Pick the mode from what the user asked for:
 
