@@ -1,5 +1,20 @@
 local map = vim.keymap.set
 
+if vim.g.neovide then
+  local modes = { "n", "v", "o", "i", "c", "t" }
+  -- One point per step at the configured 20-point base size.
+  local function zoom(delta)
+    vim.g.neovide_scale_factor = math.max(0.3, (vim.g.neovide_scale_factor or 1.0) + delta / 20)
+  end
+  for _, key in ipairs({ "<D-=>", "<D-+>" }) do
+    map(modes, key, function() zoom(1) end, { desc = "Increase Neovide font size" })
+  end
+  map(modes, "<D-->", function() zoom(-1) end, { desc = "Decrease Neovide font size" })
+  map(modes, "<D-0>", function()
+    vim.g.neovide_scale_factor = 1.0
+  end, { desc = "Reset Neovide font size" })
+end
+
 map("n", "<Esc>", "<cmd>nohlsearch<cr>")
 map("n", "<C-h>", "<C-w>h", { desc = "Window left" })
 map("n", "<C-j>", "<C-w>j", { desc = "Window down" })

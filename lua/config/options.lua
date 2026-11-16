@@ -1,5 +1,11 @@
 local opt = vim.opt
 
+-- Match Ghostty's base font; terminal Neovim keeps the terminal's font settings.
+if vim.g.neovide then
+  opt.guifont = "Google Sans Code:h20"
+  vim.g.neovide_scale_factor = 1.0
+end
+
 opt.number = true
 opt.relativenumber = true
 opt.signcolumn = "yes"

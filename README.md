@@ -75,6 +75,10 @@ nvim
 
 The first launch installs the plugins, Treesitter parsers, language servers and formatters. The project picker looks for repos in `~/dev/*` and agent worktrees in `~/.t3/worktrees`. Change `project_roots()` in `lua/plugins/editor.lua` if yours live elsewhere.
 
+## Neovide font
+
+Neovide starts with Google Sans Code at 20 points, matching Ghostty's font family and size. Install that font locally to use it. Press `⌘+` or `⌘=` to increase the size, `⌘−` to decrease it, and `⌘0` to reset to 20 points. These shortcuts also work while typing; zoom changes last for the current session.
+
 ## Keymaps
 
 Leader is Space. Localleader is `,` and is used inside Octo PR buffers (for example `,ca` to comment, `,pa` to approve). Press Space and wait to see every keymap.
