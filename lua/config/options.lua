@@ -4,6 +4,8 @@ local opt = vim.opt
 if vim.g.neovide then
   opt.guifont = "Google Sans Code:h20"
   vim.g.neovide_scale_factor = 1.0
+  vim.g.neovide_opacity = 0.70
+  vim.g.neovide_window_blurred = true
 end
 
 opt.number = true
